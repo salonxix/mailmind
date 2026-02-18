@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, Fragment } from "react";
+// @ts-ignore - next-auth types
 import { signOut, useSession, signIn } from "next-auth/react";
 import SplashScreen from "@/components/SplashScreen";
+// @ts-ignore - Next.js Link component
 import Link from "next/link";
 import CalendarView from "@/components/calendar/CalendarView";
 import ReminderPopup from "@/components/calendar/ReminderPopup";
@@ -91,18 +93,41 @@ export default function Home() {
   
   // ✅ NEW: Archive state (stores completed emails with timestamp)
   const [archivedEmails, setArchivedEmails] = useState<any[]>([]);
+  
+  // ✅ ENHANCED: Advanced Sorting & Filtering (MUST be declared BEFORE useEffect that uses them)
+  const [sortBy, setSortBy] = useState<"none" | "priority" | "deadline" | "date" | "sender">("none");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [deadlineFilter, setDeadlineFilter] = useState<"all" | "today" | "tomorrow" | "week" | "overdue">("all");
+  
   // ✅ Load Saved Folders on Startup
   useEffect(() => {
     const savedStarred = JSON.parse(localStorage.getItem("starredIds") || "[]");
     const savedSnoozed = JSON.parse(localStorage.getItem("snoozedIds") || "[]");
     const savedDone = JSON.parse(localStorage.getItem("doneIds") || "[]");
     const savedArchive = JSON.parse(localStorage.getItem("archivedEmails") || "[]");
+    
+    // ✅ Load sort preferences
+    const savedSortBy = localStorage.getItem("sortBy") as any || "none";
+    const savedSortOrder = localStorage.getItem("sortOrder") as any || "desc";
+    const savedDeadlineFilter = localStorage.getItem("deadlineFilter") as any || "all";
 
     setStarredIds(savedStarred);
     setSnoozedIds(savedSnoozed);
     setDoneIds(savedDone);
     setArchivedEmails(savedArchive);
+    setSortBy(savedSortBy);
+    setSortOrder(savedSortOrder);
+    setDeadlineFilter(savedDeadlineFilter);
   }, []);
+  
+  // ✅ Save sort preferences when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("sortBy", sortBy);
+      localStorage.setItem("sortOrder", sortOrder);
+      localStorage.setItem("deadlineFilter", deadlineFilter);
+    }
+  }, [sortBy, sortOrder, deadlineFilter]);
 
   // ✅ Load Done Emails from localStorage on startup
   useEffect(() => {
@@ -1842,9 +1867,115 @@ export default function Home() {
     return getEmailCategory(mail) === activeTab;
   });
 
-  // ✅ Get emails to display (regular or archived)
-  const displayEmails = activeFolder === "archive" ? archivedEmails : filteredEmails;
+  // ✅ ENHANCED: Advanced sorting function
+  function sortEmails(emails: any[]) {
+    if (sortBy === "none") return emails;
+    
+    return [...emails].sort((a, b) => {
+      let compareValue = 0;
+      
+      switch (sortBy) {
+        case "priority": {
+          const priorityA = getPriorityScore(a);
+          const priorityB = getPriorityScore(b);
+          compareValue = priorityB - priorityA;
+          break;
+        }
+        
+        case "deadline": {
+          const textA = (a.subject || "") + " " + (a.snippet || "");
+          const textB = (b.subject || "") + " " + (b.snippet || "");
+          const deadlineA = extractDeadline(textA);
+          const deadlineB = extractDeadline(textB);
+          
+          const getDeadlineWeight = (deadline: string | null) => {
+            if (!deadline) return 0;
+            if (deadline === "Today") return 1000;
+            if (deadline === "Tomorrow") return 500;
+            return 100;
+          };
+          
+          const weightA = getDeadlineWeight(deadlineA);
+          const weightB = getDeadlineWeight(deadlineB);
+          
+          // Combine with priority for better sorting
+          const priorityA = getPriorityScore(a);
+          const priorityB = getPriorityScore(b);
+          
+          compareValue = (weightB + priorityB) - (weightA + priorityA);
+          break;
+        }
+        
+        case "date": {
+          const dateA = new Date(a.date || 0).getTime();
+          const dateB = new Date(b.date || 0).getTime();
+          compareValue = dateB - dateA;
+          break;
+        }
+        
+        case "sender": {
+          const senderA = (a.from || "").toLowerCase();
+          const senderB = (b.from || "").toLowerCase();
+          compareValue = senderA.localeCompare(senderB);
+          break;
+        }
+      }
+      
+      return sortOrder === "desc" ? compareValue : -compareValue;
+    });
+  }
 
+  // ✅ ENHANCED: Filter emails by deadline
+  function filterByDeadline(emails: any[]) {
+    if (deadlineFilter === "all") return emails;
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    const weekEnd = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    return emails.filter((mail) => {
+      const text = (mail.subject || "") + " " + (mail.snippet || "");
+      const deadline = extractDeadline(text);
+      
+      switch (deadlineFilter) {
+        case "today":
+          return deadline === "Today";
+        
+        case "tomorrow":
+          return deadline === "Tomorrow";
+        
+        case "week": {
+          if (!deadline || deadline === "Today" || deadline === "Tomorrow") return false;
+          // Check if deadline mentions this week
+          const lowerText = text.toLowerCase();
+          return lowerText.includes("this week") || lowerText.includes("by friday") || deadline !== null;
+        }
+        
+        case "overdue": {
+          // Emails with past dates or urgent keywords
+          const lowerText = text.toLowerCase();
+          return lowerText.includes("overdue") || lowerText.includes("past due") || lowerText.includes("late");
+        }
+        
+        default:
+          return true;
+      }
+    });
+  }
+
+  // ✅ Get emails to display (regular or archived)
+  let displayEmails = activeFolder === "archive" ? archivedEmails : filteredEmails;
+  
+  // ✅ Apply deadline filter
+  if (deadlineFilter !== "all" && !showTodoView && !showWeeklyAnalysis && !showFocusMode) {
+    displayEmails = filterByDeadline(displayEmails);
+  }
+  
+  // ✅ Apply sorting
+  if (sortBy !== "none" && !showTodoView && !showWeeklyAnalysis && !showFocusMode) {
+    displayEmails = sortEmails(displayEmails);
+  }
 
   const burnout = getBurnoutStats(displayEmails);
 
@@ -3401,6 +3532,10 @@ export default function Home() {
               const category = getEmailCategory(mail);
               const tasks = showTodoView ? extractTasks(mail.snippet || mail.body || "") : [];
               
+              // ✅ Extract deadline for display
+              const text = (mail.subject || "") + " " + (mail.snippet || "");
+              const deadline = extractDeadline(text);
+              
               // ✅ Title logic for different views
               let todoTitle = "";
               let isAIGenerated = false;
@@ -3519,6 +3654,26 @@ export default function Home() {
                             ? `Completed: ${mail.completedDate}` 
                             : mail.date}
                         </span>
+
+                        {/* ✅ NEW: Deadline Badge */}
+                        {deadline && (
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 8,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: deadline === "Today" 
+                                ? "linear-gradient(135deg, #EF4444 0%, #DC2626 100%)"
+                                : deadline === "Tomorrow" 
+                                ? "linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)"
+                                : "linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)",
+                              color: "white",
+                            }}
+                          >
+                            📅 {deadline}
+                          </span>
+                        )}
 
                         {/* ✅ NEW: Completed Badge for Archive */}
                         {activeFolder === "archive" && (
