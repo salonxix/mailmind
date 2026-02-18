@@ -2,6 +2,7 @@
 
 import { Email } from "@/types";
 import { useState } from "react";
+import ErrorToast from "./ErrorToast";
 
 interface EmailDetailProps {
   selectedMail: Email | null;
@@ -41,6 +42,10 @@ export default function EmailDetail({
   const [editableReply, setEditableReply] = useState("");
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "error" | "success" | "info" | "warning";
+  } | null>(null);
 
   if (!selectedMail) {
     return (
@@ -80,15 +85,25 @@ export default function EmailDetail({
       const data = await res.json();
 
       if (data.error) {
-        alert("Error: " + data.error);
+        setToast({
+          message: data.error,
+          type: "error",
+        });
         setLoadingReply(false);
         return;
       }
 
       setAiReply(data.reply);
       setEditableReply(data.reply);
+      setToast({
+        message: "Reply generated successfully!",
+        type: "success",
+      });
     } catch (error) {
-      alert("Failed to generate reply. Check console for details.");
+      setToast({
+        message: "Failed to generate reply. Please try again.",
+        type: "error",
+      });
     }
 
     setLoadingReply(false);
@@ -96,7 +111,10 @@ export default function EmailDetail({
 
   const sendReply = async () => {
     if (!editableReply.trim()) {
-      alert("❌ Reply cannot be empty");
+      setToast({
+        message: "Reply cannot be empty",
+        type: "error",
+      });
       return;
     }
 
@@ -115,14 +133,23 @@ export default function EmailDetail({
       const data = await res.json();
 
       if (data.success) {
-        alert("✅ Reply sent successfully!");
+        setToast({
+          message: "Reply sent successfully!",
+          type: "success",
+        });
         setAiReply("");
         setEditableReply("");
       } else {
-        alert("❌ Error: " + (data.error || "Failed to send reply"));
+        setToast({
+          message: data.error || "Failed to send reply",
+          type: "error",
+        });
       }
     } catch (error) {
-      alert("❌ Failed to send reply");
+      setToast({
+        message: "Failed to send reply. Please try again.",
+        type: "error",
+      });
     }
 
     setSending(false);
@@ -131,6 +158,10 @@ export default function EmailDetail({
   const copyToClipboard = () => {
     navigator.clipboard.writeText(editableReply);
     setCopied(true);
+    setToast({
+      message: "Reply copied to clipboard!",
+      type: "success",
+    });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -139,15 +170,24 @@ export default function EmailDetail({
   const link = extractFirstLink(selectedMail.body || "");
 
   return (
-    <div
-      style={{
-        flex: 1,
-        overflowY: "auto",
-        background: "white",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <>
+      {toast && (
+        <ErrorToast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          background: "white",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
       {/* Header */}
       <div
         style={{
@@ -460,5 +500,6 @@ export default function EmailDetail({
         )}
       </div>
     </div>
+    </>
   );
 }

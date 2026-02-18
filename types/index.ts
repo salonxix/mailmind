@@ -9,6 +9,7 @@ export interface Email {
   date: string;
   label?: string[];
   attachments?: Attachment[];
+  threadId?: string;
 }
 
 export interface Attachment {
@@ -81,4 +82,57 @@ export interface Session {
     image?: string | null;
   };
   expires: string;
+}
+
+// AI Cache Maps
+export interface AIPriorityMap {
+  [emailId: string]: PriorityResult;
+}
+
+export interface AICategoryMap {
+  [emailId: string]: CategoryResult;
+}
+
+export interface AISpamMap {
+  [emailId: string]: SpamResult;
+}
+
+export interface AIDeadlineMap {
+  [emailId: string]: DeadlineResult;
+}
+
+export interface AITodoTitleMap {
+  [emailId: string]: string;
+}
+
+// API Response Types
+export interface GmailAPIResponse {
+  emails: Email[];
+  nextPageToken: string | null;
+}
+
+export interface AIAPIResponse {
+  result?: PriorityResult | CategoryResult | SpamResult | DeadlineResult;
+  reply?: string;
+  summary?: string;
+  explanation?: string;
+  title?: string;
+  error?: string;
+}
+
+export interface SendEmailRequest {
+  to: string;
+  subject: string;
+  body: string;
+}
+
+export interface ReplyEmailRequest {
+  threadId: string;
+  replyText: string;
+}
+
+export interface APIError {
+  error: string;
+  message?: string;
+  statusCode?: number;
 }

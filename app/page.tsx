@@ -1663,62 +1663,41 @@ export default function Home() {
             </button>
 
             <button
-              onClick={() => signIn("azure-ad")}
+              onClick={() => {
+                // Disabled - Coming Soon
+              }}
+              disabled
               style={{
                 padding: "14px 32px",
                 borderRadius: 14,
                 fontWeight: 700,
-                cursor: "pointer",
+                cursor: "not-allowed",
                 fontSize: 16,
-                border: "none",
+                border: "2px solid #E5E7EB",
                 position: "relative",
                 overflow: "hidden",
-
-                // Default Background = White
-                background: "white",
-                color: "#2563EB",
-              }}
-              onMouseEnter={(e) => {
-                const span = e.currentTarget.querySelector(
-                  ".fill-outlook"
-                ) as HTMLElement;
-
-                // Slide Blue fill in
-                span.style.transform = "translateX(0)";
-
-                // Text becomes White
-                e.currentTarget.style.color = "white";
-              }}
-              onMouseLeave={(e) => {
-                const span = e.currentTarget.querySelector(
-                  ".fill-outlook"
-                ) as HTMLElement;
-
-                // Slide fill back out
-                span.style.transform = "translateX(-100%)";
-
-                // Text becomes Blue again
-                e.currentTarget.style.color = "#2563EB";
+                background: "#F3F4F6",
+                color: "#9CA3AF",
+                opacity: 0.7,
               }}
             >
-              {/* Fill Background (Blue Slide) */}
+              {/* Coming Soon Badge */}
               <span
-                className="fill-outlook"
                 style={{
                   position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: "100%",
-
-                  // Hover Fill = Blue Gradient
-                  background: "linear-gradient(135deg,#2563EB,#0EA5E9)",
-
-                  transform: "translateX(-100%)",
-                  transition: "all 0.4s ease",
-                  zIndex: 0,
+                  top: -8,
+                  right: -8,
+                  background: "linear-gradient(135deg, #F59E0B, #EF4444)",
+                  color: "white",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "4px 8px",
+                  borderRadius: 999,
+                  zIndex: 2,
                 }}
-              ></span>
+              >
+                COMING SOON
+              </span>
 
               {/* Button Text */}
               <span style={{ position: "relative", zIndex: 1 }}>
