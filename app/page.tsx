@@ -1,14 +1,28 @@
 "use client";
 
 import { useEffect, useState, Fragment } from "react";
-// @ts-ignore - next-auth types
 import { signOut, useSession, signIn } from "next-auth/react";
-import SplashScreen from "@/components/SplashScreen";
-// @ts-ignore - Next.js Link component
 import Link from "next/link";
+import SplashScreen from "@/components/SplashScreen";
 import CalendarView from "@/components/calendar/CalendarView";
 import ReminderPopup from "@/components/calendar/ReminderPopup";
 import TeamCollaboration from "@/components/team/TeamCollaboration";
+import Sidebar from "@/components/Sidebar";
+import ComposeModal from "@/components/ComposeModal";
+import EmailDetail from "@/components/EmailDetail";
+import WeeklyAnalysis from "@/components/WeeklyAnalysis";
+import FocusMode from "@/components/FocusMode";
+import { Email, WeeklyAnalysis as WeeklyAnalysisType } from "@/types";
+import { 
+  extractEmail, 
+  getInitials, 
+  extractFirstLink, 
+  cleanEmailBody,
+  getPriorityColor,
+  getCategoryColor,
+  getUrgencyLevel,
+  isFirstTimeSender as isFirstTimeSenderHelper
+} from "@/utils/emailHelpers";
 
 
 
@@ -25,9 +39,6 @@ export default function Home() {
   // 🕒 Current Date & Time
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mounted, setMounted] = useState(false);
-  const [geminiQuestion, setGeminiQuestion] = useState("");
-  const [geminiReply, setGeminiReply] = useState("");
-  const [loadingGemini, setLoadingGemini] = useState(false);
 
 
 
@@ -42,13 +53,6 @@ export default function Home() {
   const [newMails, setNewMails] = useState<any[]>([]);
   // ✅ Toolbar Feature States
   const [showCompose, setShowCompose] = useState(false);
-  const [showGemini, setShowGemini] = useState(false);
-
-  // ✅ NEW: Compose email state
-  const [composeTo, setComposeTo] = useState("");
-  const [composeSubject, setComposeSubject] = useState("");
-  const [composeBody, setComposeBody] = useState("");
-  const [sendingEmail, setSendingEmail] = useState(false);
 
 
 
@@ -223,47 +227,6 @@ export default function Home() {
   }
 
 
-
-  // ✅ NEW: Send composed email
-  async function sendComposedEmail() {
-    if (!composeTo || !composeSubject || !composeBody) {
-      alert("❌ Please fill in all fields (To, Subject, Body)");
-      return;
-    }
-
-    setSendingEmail(true);
-
-    try {
-      const res = await fetch("/api/gmail/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: composeTo,
-          subject: composeSubject,
-          body: composeBody,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        alert("✅ Email sent successfully!");
-        // Clear form
-        setComposeTo("");
-        setComposeSubject("");
-        setComposeBody("");
-        setShowCompose(false);
-      } else {
-        alert("❌ Error: " + (data.error || "Failed to send email"));
-      }
-    } catch (error) {
-      console.error("Send email error:", error);
-      alert("❌ Failed to send email. Check console for details.");
-    }
-
-    setSendingEmail(false);
-  }
-
   // ⏳ Snooze Email (hide from inbox)
   function snoozeMail() {
     if (!selectedMail) return;
@@ -276,42 +239,6 @@ export default function Home() {
 
     setSelectedMail(null);
   }
-  async function askGemini() {
-    if (!selectedMail) {
-      alert("Select an email first");
-      return;
-    }
-
-    setLoadingGemini(true);
-    setGeminiReply("");
-
-    const emailText =
-      selectedMail.subject +
-      "\n\n" +
-      selectedMail.snippet +
-      "\n\n" +
-      (selectedMail.body || "");
-
-    const res = await fetch("/api/gemini", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        emailText,
-        question: geminiQuestion || "Summarize this email clearly",
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.reply) {
-      setGeminiReply(data.reply);
-    } else {
-      setGeminiReply("❌ Gemini failed: " + data.error);
-    }
-
-    setLoadingGemini(false);
-  }
-
 
   // ✅ Mark Done (archive the email)
   function markDone() {
@@ -1452,31 +1379,6 @@ export default function Home() {
       .replace(/unsubscribe[\s\S]*/gi, "")
       .replace(/\s+/g, " ")
       .trim();
-  }
-
-  /* ✅ ADD THIS EXACTLY HERE */
-  function extractEmail(raw: string) {
-    if (!raw) return "";
-
-    // Case 1: Name <email>
-    const match = raw.match(/<(.+?)>/);
-    if (match) return match[1];
-
-    // Case 2: Direct email
-    if (raw.includes("@")) return raw.trim();
-
-    return "";
-  }
-
-  // ✅ Helper function to get initials from email
-  function getInitials(email: string) {
-    if (!email) return "?";
-    const name = email.split("@")[0];
-    const parts = name.split(/[._-]/);
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
   }
 
   // ✅ Action Button Style
@@ -3915,22 +3817,6 @@ export default function Home() {
                     >
                       🗑️
                     </button>
-
-                    {/* 💎 Gemini */}
-                    <button
-                      onClick={() => setShowGemini(true)}
-                      title="Ask Gemini"
-                      style={{
-                        padding: "6px 10px",
-                        fontSize: 14,
-                        borderRadius: 8,
-                        border: "1px solid #ddd",
-                        cursor: "pointer",
-                        background: "#DBEAFE",
-                      }}
-                    >
-                      💎 Ask Gemini
-                    </button>
                   </div>
                 </div>
                 {/* ✅ DEADLINE DETECTOR CARD */}
@@ -4564,227 +4450,12 @@ export default function Home() {
           )}
         </div>
       </div>
-      {/* ✅ COMPOSE MODAL POPUP */}
-      {showCompose && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 99999,
-          }}
-        >
-          <div
-            style={{
-              width: 520,
-              background: "white",
-              padding: 24,
-              borderRadius: 18,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-            }}
-          >
-            <h2 style={{ fontWeight: 800, fontSize: 18 }}>
-              ✍ Compose Email
-            </h2>
-
-            <input
-              placeholder="To (email address)"
-              value={composeTo}
-              onChange={(e) => setComposeTo(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 12,
-                marginTop: 14,
-                borderRadius: 10,
-                border: "1px solid #ddd",
-              }}
-            />
-
-            <input
-              placeholder="Subject"
-              value={composeSubject}
-              onChange={(e) => setComposeSubject(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 12,
-                marginTop: 10,
-                borderRadius: 10,
-                border: "1px solid #ddd",
-              }}
-            />
-
-            <textarea
-              placeholder="Write your email..."
-              rows={6}
-              value={composeBody}
-              onChange={(e) => setComposeBody(e.target.value)}
-              style={{
-                width: "100%",
-                padding: 12,
-                marginTop: 10,
-                borderRadius: 10,
-                border: "1px solid #ddd",
-                resize: "vertical",
-              }}
-            />
-
-            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-              <button
-                onClick={sendComposedEmail}
-                disabled={sendingEmail}
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "none",
-                  background: sendingEmail 
-                    ? "#9CA3AF" 
-                    : "linear-gradient(135deg,#2563EB,#0EA5E9)",
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: sendingEmail ? "not-allowed" : "pointer",
-                }}
-              >
-                {sendingEmail ? "Sending..." : "Send"}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowCompose(false);
-                  // Clear form on close
-                  setComposeTo("");
-                  setComposeSubject("");
-                  setComposeBody("");
-                }}
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  borderRadius: 10,
-                  border: "none",
-                  background: "#EF4444",
-                  color: "white",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ✅ GEMINI MODAL POPUP */}
-      {showGemini && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 99999,
-          }}
-        >
-          <div
-            style={{
-              width: 520,
-              background: "white",
-              padding: 24,
-              borderRadius: 18,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-            }}
-          >
-            <h2 style={{ fontWeight: 800, fontSize: 18 }}>
-              💎 Ask Gemini
-            </h2>
-
-            {/* Question Input */}
-            <textarea
-              rows={4}
-              value={geminiQuestion}
-              onChange={(e) => setGeminiQuestion(e.target.value)}
-              placeholder="Ask Gemini about this email..."
-              style={{
-                width: "100%",
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #ddd",
-                marginTop: 12,
-              }}
-            />
-
-            {/* Ask Button */}
-            <button
-              onClick={askGemini}
-              style={{
-                marginTop: 14,
-                width: "100%",
-                padding: 12,
-                borderRadius: 10,
-                border: "none",
-                background: "linear-gradient(135deg,#2563EB,#0EA5E9)",
-                color: "white",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              {loadingGemini ? "Thinking..." : "Ask Gemini 💎"}
-            </button>
-
-            {/* Reply Output */}
-            {geminiReply && (
-              <div
-                style={{
-                  marginTop: 14,
-                  padding: 14,
-                  background: "#F3F4F6",
-                  borderRadius: 12,
-                  fontSize: 14,
-                  whiteSpace: "pre-wrap",
-                  border: "1px solid #E5E7EB",
-                }}
-              >
-                {geminiReply}
-              </div>
-            )}
-
-            {/* Close */}
-            <button
-              onClick={() => {
-                setShowGemini(false);
-                setGeminiQuestion("");
-                setGeminiReply("");
-              }}
-              style={{
-                marginTop: 14,
-                width: "100%",
-                padding: 12,
-                borderRadius: 10,
-                border: "none",
-                background: "#EF4444",
-                color: "white",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-
-
+      
+      {/* Compose Modal Component */}
+      <ComposeModal
+        showCompose={showCompose}
+        setShowCompose={setShowCompose}
+      />
     </div>
 
   );
