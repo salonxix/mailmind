@@ -612,17 +612,21 @@ export default function Home() {
 
   // ✅ AI: Batch generate all AI data for visible emails
   async function generateAllAIData(emails: any[]) {
-    const emailsNeedingAI = emails.slice(0, 10); // Process first 10 emails
+    const emailsNeedingAI = emails.slice(0, 20); // Process first 20 emails
     
-    // Generate all AI data in parallel
-    await Promise.all(emailsNeedingAI.map(async (mail) => {
-      await Promise.all([
-        generateAIPriorityForMail(mail),
-        generateAICategoryForMail(mail),
-        generateAISpamDetection(mail),
-        generateAIDeadline(mail),
-      ]);
-    }));
+    // Generate all AI data in parallel (in batches of 5 to avoid overwhelming the API)
+    const batchSize = 5;
+    for (let i = 0; i < emailsNeedingAI.length; i += batchSize) {
+      const batch = emailsNeedingAI.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (mail) => {
+        await Promise.all([
+          generateAIPriorityForMail(mail),
+          generateAICategoryForMail(mail),
+          generateAISpamDetection(mail),
+          generateAIDeadline(mail),
+        ]);
+      }));
+    }
   }
 
 
@@ -863,11 +867,27 @@ export default function Home() {
 
   // ✅ AI: Auto-generate AI data for emails when they load
   useEffect(() => {
-    if (emails.length > 0 && !showTodoView && !showWeeklyAnalysis && !showFocusMode) {
-      // Generate AI data for visible emails
-      generateAllAIData(filteredEmails.slice(0, 10));
+    if (emails.length > 0) {
+      // Get the currently displayed emails based on active folder and tab
+      const displayEmails = emails.filter((mail) => {
+        // Filter by folder
+        if (activeFolder === "inbox") {
+          if (mail.label?.includes("SENT") || mail.label?.includes("DRAFT")) return false;
+        } else if (activeFolder === "starred") {
+          return starredIds.includes(mail.id);
+        } else if (activeFolder === "snoozed") {
+          return snoozedIds.includes(mail.id);
+        } else if (activeFolder === "drafts") {
+          return mail.label?.includes("DRAFT");
+        }
+        
+        return true;
+      });
+      
+      // Generate AI data for first 20 visible emails
+      generateAllAIData(displayEmails.slice(0, 20));
     }
-  }, [emails.length, activeTab, activeFolder]);
+  }, [emails.length, activeTab, activeFolder, starredIds.length, snoozedIds.length]);
 
   // ✅ NEW: Auto-generate AI titles for archived emails without titles
   useEffect(() => {
@@ -906,10 +926,16 @@ export default function Home() {
   }
   
   // ✅ AI-POWERED: Get email category from AI or cache
+  // ✅ AI-POWERED: Get email category from AI or cache
   function getEmailCategory(mail: any) {
     // Check if AI category exists in cache
     if (aiCategoryMap[mail.id]?.category) {
       return aiCategoryMap[mail.id].category;
+    }
+    
+    // Trigger AI generation if not in cache
+    if (!aiCategoryMap[mail.id]) {
+      generateAICategoryForMail(mail);
     }
     
     // Fallback while AI is loading
@@ -932,6 +958,11 @@ export default function Home() {
       return aiSpamMap[mail.id].isSpam;
     }
     
+    // Trigger AI generation if not in cache
+    if (!aiSpamMap[mail.id]) {
+      generateAISpamDetection(mail);
+    }
+    
     // Fallback: don't mark as spam while AI is loading
     return false;
   }
@@ -941,6 +972,15 @@ export default function Home() {
     // If mailId provided, check AI cache
     if (mailId && aiDeadlineMap[mailId]?.deadline) {
       return aiDeadlineMap[mailId].deadline;
+    }
+    
+    // Trigger AI generation if mailId provided and not in cache
+    if (mailId && !aiDeadlineMap[mailId]) {
+      // Find the mail object to pass to the AI function
+      const mail = emails.find(m => m.id === mailId);
+      if (mail) {
+        generateAIDeadline(mail);
+      }
     }
     
     // Fallback: basic regex extraction while AI is loading
