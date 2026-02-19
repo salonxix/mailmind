@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const MODEL = "llama-3.3-70b-versatile";
+
+if (!GROQ_API_KEY) {
+  console.error("❌ GROQ_API_KEY is not configured");
+}
 
 export async function POST(req: Request) {
+  if (!GROQ_API_KEY) {
+    return NextResponse.json({
+      events: [],
+      error: "API key not configured"
+    }, { status: 500 });
+  }
+
   try {
     const { subject, body, snippet } = await req.json();
 
@@ -36,19 +45,27 @@ Return format:
 If no events found, return empty array [].
 IMPORTANT: Return ONLY valid JSON, no other text.`;
 
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: "user", content: prompt }],
-      model: "llama-3.3-70b-versatile",
-      temperature: 0.3,
-      max_tokens: 500,
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500,
+      }),
     });
 
-    const response = completion.choices[0]?.message?.content || "[]";
+    const data = await response.json();
+    const responseText = data.choices[0]?.message?.content || "[]";
     
     // Extract JSON from response
     let events = [];
     try {
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         events = JSON.parse(jsonMatch[0]);
       }

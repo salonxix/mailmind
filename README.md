@@ -11,7 +11,7 @@
 
 ## 🚀 Overview
 
-MailMind is an AI-powered email management application that helps you organize, prioritize, and manage your Gmail inbox intelligently. Built with Next.js and powered by Groq's Llama 3.1 8B model, it provides real AI analysis (not just keyword matching) for email categorization, priority scoring, spam detection, and deadline extraction.
+MailMind is an AI-powered email management application that helps you organize, prioritize, and manage your Gmail inbox intelligently. Built with Next.js and powered by OpenRouter's Qwen 2.5 Coder 32B model, it provides real AI analysis (not just keyword matching) for email categorization, priority scoring, spam detection, and deadline extraction.
 
 ### The Problem
 
@@ -24,7 +24,7 @@ MailMind uses AI to understand your emails contextually - analyzing content, urg
 ## ✨ Key Features
 
 ### 1. 🎯 AI Priority Scoring (1-100)
-Real AI-powered priority analysis using Groq Llama 3.1 8B:
+Real AI-powered priority analysis using Qwen 2.5 Coder 32B:
 - Analyzes email content and context
 - Assigns priority score with reasoning
 - No keyword matching - understands nuance
@@ -102,7 +102,7 @@ Natural language deadline understanding:
 ┌────────────────────────▼─────────────────────────────────────┐
 │                  External Services                           │
 │                                                              │
-│  • Groq API (Llama 3.1 8B Instant) - AI inference           │
+│  • OpenRouter API (Qwen 2.5 Coder 32B) - AI inference      │
 │  • Gmail API (googleapis) - Email operations                │
 │  • NextAuth.js - OAuth 2.0 authentication                   │
 └──────────────────────────────────────────────────────────────┘
@@ -114,7 +114,7 @@ Natural language deadline understanding:
 - Node.js 16+
 - npm or yarn
 - Gmail account
-- Groq API key (free at console.groq.com)
+- OpenRouter API key (free at openrouter.ai)
 
 ### Installation
 
@@ -132,8 +132,8 @@ npm install
 3. **Set up environment variables**
 Create `.env.local` file:
 ```bash
-# Groq AI
-GROQ_API_KEY=your_groq_api_key_here
+# OpenRouter AI (using Qwen 2.5 Coder 32B)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # Google OAuth (for Gmail integration)
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -239,8 +239,8 @@ const { result } = await response.json();
 - **Mailparser** - Email parsing
 
 ### AI/ML
-- **Groq SDK** - Ultra-fast AI inference
-- **Llama 3.1 8B Instant** - Primary AI model
+- **OpenRouter** - AI inference platform
+- **Qwen 2.5 Coder 32B** - Primary AI model
 
 ### Development
 - **ESLint** - Code linting
@@ -265,7 +265,7 @@ const { result } = await response.json();
 ## 🎯 What's Real vs What's Not
 
 ### ✅ Actually Implemented
-- AI-powered priority scoring (Groq Llama 3.1 8B)
+- AI-powered priority scoring (Qwen 2.5 Coder 32B)
 - AI email categorization
 - AI spam detection
 - AI deadline extraction
@@ -309,7 +309,7 @@ Built for AlgosQuest 2025
 
 ## 🙏 Acknowledgments
 
-- Groq for ultra-fast AI inference
+- OpenRouter for AI inference platform
 - Google for Gmail API
 - Next.js team for the amazing framework
 - Open source community

@@ -442,31 +442,79 @@ export default function Home() {
   // ✅ NEW: AI Priority function for individual emails
   async function generateAIPriorityForMail(mail: Email) {
 
-    // ✅ Already generated → skip
-    if (aiPriorityMap[mail.id]) return;
-
-    const res = await fetch("/api/ai/priority", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject: mail.subject,
-        snippet: mail.snippet,
-      }),
-    });
-
-    const data = await res.json();
-
-    if (data.result?.score) {
-      setAiPriorityMap((prev) => ({
-        ...prev,
-        [mail.id]: data.result,
-      }));
-      
-      // ✅ Only update progress if we're in batch processing mode
+    // ✅ Already generated → skip but still count as completed
+    if (aiPriorityMap[mail.id]) {
       if (isBatchProcessing) {
         setAiProgress(prev => ({
           ...prev,
-          priority: { ...prev.priority, completed: prev.priority.completed + 1 }
+          priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+        }));
+      }
+      return;
+    }
+
+    try {
+      console.log(`🔍 Calling Priority API for email: ${mail.subject?.substring(0, 50)}`);
+      
+      const res = await fetch("/api/ai/priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: mail.subject,
+          snippet: mail.snippet,
+        }),
+      });
+
+      console.log(`📡 Priority API Response Status: ${res.status}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Priority API HTTP Error ${res.status}:`, errorText);
+        
+        // Still count as completed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+          }));
+        }
+        return;
+      }
+
+      const data = await res.json();
+      console.log(`📊 Priority API Response:`, data);
+
+      if (data.result?.score) {
+        console.log(`✅ Priority Score: ${data.result.score} - ${data.result.reason}`);
+        setAiPriorityMap((prev) => ({
+          ...prev,
+          [mail.id]: data.result,
+        }));
+        
+        // ✅ Only update progress if we're in batch processing mode
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+          }));
+        }
+      } else {
+        console.error("❌ Priority API returned no result:", data);
+        // Still count as completed even if failed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Priority API Error:", error);
+      // Still count as completed even if failed
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
         }));
       }
     }
@@ -527,8 +575,16 @@ export default function Home() {
 
   // ✅ AI: Generate AI-powered category for email
   async function generateAICategoryForMail(mail: Email) {
-    // Already generated → skip
-    if (aiCategoryMap[mail.id]) return;
+    // Already generated → skip but still count as completed
+    if (aiCategoryMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          category: { ...prev.category, completed: Math.min(prev.category.completed + 1, prev.category.total) }
+        }));
+      }
+      return;
+    }
 
     try {
       const res = await fetch("/api/ai/categorize", {
@@ -552,7 +608,7 @@ export default function Home() {
         if (isBatchProcessing) {
           setAiProgress(prev => ({
             ...prev,
-            category: { ...prev.category, completed: prev.category.completed + 1 }
+            category: { ...prev.category, completed: Math.min(prev.category.completed + 1, prev.category.total) }
           }));
         }
       }
@@ -563,8 +619,16 @@ export default function Home() {
 
   // ✅ AI: Generate AI-powered spam detection for email
   async function generateAISpamDetection(mail: Email) {
-    // Already generated → skip
-    if (aiSpamMap[mail.id]) return;
+    // Already generated → skip but still count as completed
+    if (aiSpamMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          spam: { ...prev.spam, completed: Math.min(prev.spam.completed + 1, prev.spam.total) }
+        }));
+      }
+      return;
+    }
 
     try {
       const res = await fetch("/api/ai/spam-detect", {
@@ -589,7 +653,7 @@ export default function Home() {
         if (isBatchProcessing) {
           setAiProgress(prev => ({
             ...prev,
-            spam: { ...prev.spam, completed: prev.spam.completed + 1 }
+            spam: { ...prev.spam, completed: Math.min(prev.spam.completed + 1, prev.spam.total) }
           }));
         }
       }
@@ -600,10 +664,20 @@ export default function Home() {
 
   // ✅ AI: Generate AI-powered deadline extraction for email
   async function generateAIDeadline(mail: Email) {
-    // Already generated → skip
-    if (aiDeadlineMap[mail.id]) return;
+    // Already generated → skip but still count as completed
+    if (aiDeadlineMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+        }));
+      }
+      return;
+    }
 
     try {
+      console.log(`🔍 Calling Deadline API for email: ${mail.subject?.substring(0, 50)}`);
+      
       const res = await fetch("/api/ai/extract-deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -613,9 +687,27 @@ export default function Home() {
         }),
       });
 
+      console.log(`📡 Deadline API Response Status: ${res.status}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Deadline API HTTP Error ${res.status}:`, errorText);
+        
+        // Still count as completed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+          }));
+        }
+        return;
+      }
+
       const data = await res.json();
+      console.log(`📊 Deadline API Response:`, data);
 
       if (data.result) {
+        console.log(`✅ Deadline: ${data.result.deadline} - Urgency: ${data.result.urgency}`);
         setAiDeadlineMap((prev) => ({
           ...prev,
           [mail.id]: data.result,
@@ -625,51 +717,60 @@ export default function Home() {
         if (isBatchProcessing) {
           setAiProgress(prev => ({
             ...prev,
-            deadline: { ...prev.deadline, completed: prev.deadline.completed + 1 }
+            deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+          }));
+        }
+      } else {
+        console.error("❌ Deadline API returned no result:", data);
+        // Still count as completed even if failed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
           }));
         }
       }
     } catch (error) {
-      // Silent fail - AI deadline extraction is optional
+      console.error("❌ Deadline API Error:", error);
+      // Still count as completed even if failed
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+        }));
+      }
     }
   }
 
-  // ✅ AI: Batch generate all AI data for visible emails
+  // ✅ AI: Batch generate all AI data for visible emails (OPTIMIZED FOR GROQ)
   async function generateAllAIData(emails: Email[]) {
-    // ✅ FIX: Filter out emails that already have ALL AI data
+    // Process 2 emails at a time to avoid rate limits
     const emailsNeedingAI = emails.filter(mail => 
-      !aiPriorityMap[mail.id] || 
-      !aiCategoryMap[mail.id] || 
-      !aiSpamMap[mail.id] || 
-      !aiDeadlineMap[mail.id]
-    ).slice(0, 20); // Process max 20 emails
+      !aiPriorityMap[mail.id]
+    ).slice(0, 2); // Reduced to 2 emails
     
     if (emailsNeedingAI.length === 0) return;
     
-    // ✅ Enable batch processing mode
     setIsBatchProcessing(true);
     
-    // Initialize progress
+    // Initialize progress - Priority only
     setShowAiProgress(true);
     setAiProgress({
       priority: { total: emailsNeedingAI.length, completed: 0, status: 'loading' },
-      category: { total: emailsNeedingAI.length, completed: 0, status: 'loading' },
-      spam: { total: emailsNeedingAI.length, completed: 0, status: 'loading' },
-      deadline: { total: emailsNeedingAI.length, completed: 0, status: 'loading' },
+      category: { total: 0, completed: 0, status: 'done' },
+      spam: { total: 0, completed: 0, status: 'done' },
+      deadline: { total: 0, completed: 0, status: 'done' },
     });
     
-    // Generate all AI data in parallel (in batches of 5 to avoid overwhelming the API)
-    const batchSize = 5;
-    for (let i = 0; i < emailsNeedingAI.length; i += batchSize) {
-      const batch = emailsNeedingAI.slice(i, i + batchSize);
-      await Promise.all(batch.map(async (mail) => {
-        await Promise.all([
-          generateAIPriorityForMail(mail),
-          generateAICategoryForMail(mail),
-          generateAISpamDetection(mail),
-          generateAIDeadline(mail),
-        ]);
-      }));
+    // Process emails with 10-second delays (safer for rate limits)
+    for (let i = 0; i < emailsNeedingAI.length; i++) {
+      const mail = emailsNeedingAI[i];
+      
+      // Priority scoring only
+      if (!aiPriorityMap[mail.id]) {
+        await generateAIPriorityForMail(mail);
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds between requests
+      }
     }
     
     // Mark all as done
@@ -680,10 +781,8 @@ export default function Home() {
       deadline: { ...prev.deadline, status: 'done' },
     }));
     
-    // ✅ Disable batch processing mode
     setIsBatchProcessing(false);
     
-    // Hide progress after 2 seconds
     setTimeout(() => setShowAiProgress(false), 2000);
   }
 
@@ -917,13 +1016,13 @@ export default function Home() {
     }
   }, [showTodoView, emails.length]);
 
-  // ✅ AI: Auto-generate AI data for emails when they load (ONCE)
+  // ✅ AI: Auto-generate AI data for emails when they load (OPTIMIZED)
   useEffect(() => {
     // ✅ Safety check: only run in browser with session
     if (typeof window === 'undefined' || !session || emails.length === 0) return;
     
-    // ✅ FIX: Only process emails that don't have AI data yet
-    const emailsNeedingAI = emails.slice(0, 20).filter(mail => 
+    // ✅ CRITICAL FIX: Only process first 5 emails to avoid overwhelming API
+    const emailsNeedingAI = emails.slice(0, 5).filter(mail => 
       !aiPriorityMap[mail.id] || 
       !aiCategoryMap[mail.id] || 
       !aiSpamMap[mail.id] || 
@@ -961,6 +1060,11 @@ export default function Home() {
     // Check if AI score exists in cache
     if (aiPriorityMap[mail.id]?.score) {
       return aiPriorityMap[mail.id].score;
+    }
+    
+    // ✅ Trigger AI generation if not in cache and not already processing
+    if (!aiPriorityMap[mail.id] && !isBatchProcessing) {
+      generateAIPriorityForMail(mail);
     }
     
     // Fallback to basic score while AI is loading
@@ -2293,7 +2397,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Powered by Groq */}
+            {/* Powered by Qwen */}
             <div
               style={{
                 marginTop: 16,
@@ -2305,7 +2409,7 @@ export default function Home() {
                 fontWeight: 600,
               }}
             >
-              Powered by Groq Llama 3.1 8B ⚡
+              Powered by Qwen3 Coder 480B ⚡
             </div>
           </div>
         )}
