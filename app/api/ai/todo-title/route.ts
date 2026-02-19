@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
-import Groq from "groq-sdk";
+
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const MODEL = "llama-3.3-70b-versatile";
+
+if (!GROQ_API_KEY) {
+  console.error("❌ GROQ_API_KEY is not configured");
+}
 
 export async function POST(req: Request) {
   try {
     const { subject, snippet } = await req.json();
 
-    // ✅ Check if API key is configured
-    if (!process.env.GROQ_API_KEY) {
-      console.warn("GROQ_API_KEY not configured, returning subject as fallback");
+    if (!GROQ_API_KEY) {
+      console.warn("GROQ_API_KEY not configured");
       return NextResponse.json({
         title: subject?.substring(0, 45) || "Read email",
       });
@@ -16,16 +21,18 @@ export async function POST(req: Request) {
     // ✅ Trim input to avoid token overload
     const safeSnippet = (snippet || "").slice(0, 500);
 
-    const groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY!,
-    });
-
-    const chatCompletion = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content: `You are a task extraction assistant. Generate a SHORT, actionable to-do title from emails.
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          {
+            role: "system",
+            content: `You are a task extraction assistant. Generate a SHORT, actionable to-do title from emails.
 
 CRITICAL RULES:
 - Maximum 4-5 words
@@ -52,17 +59,19 @@ BAD EXAMPLES (Don't do this):
 ❌ "Check this out"
 ❌ "Register for GTC" (too vague)
 ❌ "Apply 50% Pro discount" (promotional)`,
-        },
-        {
-          role: "user",
-          content: `Subject: ${subject}\nContent: ${safeSnippet}`,
-        },
-      ],
-      temperature: 0.2,
-      max_tokens: 25,
+          },
+          {
+            role: "user",
+            content: `Subject: ${subject}\nContent: ${safeSnippet}`,
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 25,
+      }),
     });
 
-    const title = chatCompletion.choices[0].message.content?.trim() || subject;
+    const data = await response.json();
+    const title = data.choices[0]?.message?.content?.trim() || subject;
 
     // ✅ Ensure title is not too long
     const finalTitle = title.length > 50 ? title.substring(0, 47) + "..." : title;

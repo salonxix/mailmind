@@ -14,19 +14,14 @@ import WeeklyAnalysis from "@/components/WeeklyAnalysis";
 import FocusMode from "@/components/FocusMode";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
-import LandingBackground from "@/components/LandingBackground";
-import FeaturesSection from "@/components/landing/FeaturesSection";
-import WhySection from "@/components/landing/WhySection";
-import DemoVideoSection from "@/components/landing/DemoVideoSection";
 import Footer from "@/components/Footer";
+import LandingBackground from "@/components/LandingBackground";
+
+
+import WhySection from "@/components/landing/WhySection";
 import DemoInboxSection from "@/components/landing/DemoInboxSection";
-
-
-
-
-
-
-import { Email, WeeklyAnalysis as WeeklyAnalysisType, ActiveFolder, ActiveTab } from "@/types";
+import DemoVideoSection from "@/components/landing/DemoVideoSection";
+import { Email, WeeklyAnalysis as WeeklyAnalysisType, ActiveFolder, ActiveTab, ArchivedEmail, PriorityResult, CategoryResult, SpamResult, DeadlineResult, CalendarEvent, TeamMember, EmailAssignment, Attachment } from "@/types";
 import { 
   extractEmail, 
   getInitials, 
@@ -43,11 +38,8 @@ import {
 
 export default function Home() {
   const { data: session } = useSession();
-  useEffect(() => {
-    console.log("SESSION:", session);
-  }, [session]);
 
-  const [hoverFile, setHoverFile] = useState<any>(null);
+  const [hoverFile, setHoverFile] = useState<Attachment | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [showProfile, setShowProfile] = useState(false);
   // 🕒 Current Date & Time
@@ -64,7 +56,7 @@ export default function Home() {
   const [showNotifications, setShowNotifications] = useState(false);
 
   // 🔔 Store New Emails List
-  const [newMails, setNewMails] = useState<any[]>([]);
+  const [newMails, setNewMails] = useState<Email[]>([]);
   // ✅ Toolbar Feature States
   const [showCompose, setShowCompose] = useState(false);
 
@@ -77,15 +69,26 @@ export default function Home() {
   const [editableReply, setEditableReply] = useState("");
   const [copied, setCopied] = useState(false);
   const [sending, setSending] = useState(false);
-  const [aiPriorityMap, setAiPriorityMap] = useState<any>({});
+  const [aiPriorityMap, setAiPriorityMap] = useState<Record<string, PriorityResult>>({});
   // ✅ NEW: Cache AI-generated to-do titles
-  const [aiTodoTitles, setAiTodoTitles] = useState<any>({});
+  const [aiTodoTitles, setAiTodoTitles] = useState<Record<string, string>>({});
   // ✅ AI: Cache AI-generated categories
-  const [aiCategoryMap, setAiCategoryMap] = useState<any>({});
+  const [aiCategoryMap, setAiCategoryMap] = useState<Record<string, CategoryResult>>({});
   // ✅ AI: Cache AI-generated spam detection
-  const [aiSpamMap, setAiSpamMap] = useState<any>({});
+  const [aiSpamMap, setAiSpamMap] = useState<Record<string, SpamResult>>({});
   // ✅ AI: Cache AI-generated deadlines
-  const [aiDeadlineMap, setAiDeadlineMap] = useState<any>({});
+  const [aiDeadlineMap, setAiDeadlineMap] = useState<Record<string, DeadlineResult>>({});
+  
+  // ✅ AI Progress Tracking
+  const [aiProgress, setAiProgress] = useState({
+    priority: { total: 0, completed: 0, status: 'idle' as 'idle' | 'loading' | 'done' },
+    category: { total: 0, completed: 0, status: 'idle' as 'idle' | 'loading' | 'done' },
+    spam: { total: 0, completed: 0, status: 'idle' as 'idle' | 'loading' | 'done' },
+    deadline: { total: 0, completed: 0, status: 'idle' as 'idle' | 'loading' | 'done' },
+  });
+  const [showAiProgress, setShowAiProgress] = useState(false);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false); // ✅ Track if we're in batch mode
+  
   // ⭐ Starred Emails
   const [starredIds, setStarredIds] = useState<string[]>([]);
   // ✅ Load Starred Emails from localStorage on startup
@@ -116,7 +119,7 @@ export default function Home() {
   const [doneIds, setDoneIds] = useState<string[]>([]);
   
   // ✅ NEW: Archive state (stores completed emails with timestamp)
-  const [archivedEmails, setArchivedEmails] = useState<any[]>([]);
+  const [archivedEmails, setArchivedEmails] = useState<ArchivedEmail[]>([]);
   
   // ✅ ENHANCED: Advanced Sorting & Filtering (MUST be declared BEFORE useEffect that uses them)
   const [sortBy, setSortBy] = useState<"none" | "priority" | "deadline" | "date" | "sender">("none");
@@ -174,17 +177,17 @@ export default function Home() {
   const [aiReason, setAiReason] = useState("");
   const [loadingAI, setLoadingAI] = useState(false);
 
-  const [emails, setEmails] = useState<any[]>([]);
+  const [emails, setEmails] = useState<Email[]>([]);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [selectedMail, setSelectedMail] = useState<any>(null);
+  const [selectedMail, setSelectedMail] = useState<Email | null>(null);
 
 
   const [summary, setSummary] = useState<string>("");
   const [summarizing, setSummarizing] = useState(false);
 
-  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<string[]>([]);
   // ✅ FIX 1: Default tab to "All Mails"
   const [activeTab, setActiveTab] = useState<ActiveTab>("All Mails");
   
@@ -199,13 +202,13 @@ export default function Home() {
   
   // ✅ Calendar View State
   const [showCalendarView, setShowCalendarView] = useState(false);
-  const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
-  const [activeReminder, setActiveReminder] = useState<any>(null);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [activeReminder, setActiveReminder] = useState<CalendarEvent | null>(null);
   
   // ✅ Team View State
   const [showTeamView, setShowTeamView] = useState(false);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
-  const [assignedEmails, setAssignedEmails] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [assignedEmails, setAssignedEmails] = useState<EmailAssignment[]>([]);
 
   // 🔍 Search Query
   const [searchQuery, setSearchQuery] = useState("");
@@ -279,7 +282,7 @@ export default function Home() {
           minute: "2-digit",
         }),
         // ✅ Save the AI-generated to-do title if available
-        todoTitle: aiTodoTitles[selectedMail.id] || null,
+        todoTitle: aiTodoTitles[selectedMail.id] || undefined,
       };
       
       const updated = [archivedEmail, ...prev]; // Add to beginning
@@ -351,7 +354,7 @@ export default function Home() {
   };
 
   // ✅ FIXED: Combined function that fetches email AND generates AI
-  const openMailAndGenerateAI = async (id: string, mailPreview: any) => {
+  const openMailAndGenerateAI = async (id: string, mailPreview: Email) => {
     // Reset AI states
     setAiSummary("");
     setAiReason("");
@@ -381,25 +384,15 @@ export default function Home() {
   };
 
   async function generateReply() {
-    console.log("✅ generateReply() running...");
-
     if (!selectedMail) {
-      console.log("❌ No email selected");
       alert("Please select an email first");
       return;
     }
-
-    console.log("📧 Email data:", {
-      subject: selectedMail.subject,
-      snippet: selectedMail.snippet?.substring(0, 100),
-    });
 
     setLoadingReply(true);
     setAiReply("");
 
     try {
-      console.log("🚀 Sending request to /api/ai/reply...");
-
       const res = await fetch("/api/ai/reply", {
         method: "POST",
         headers: {
@@ -411,13 +404,9 @@ export default function Home() {
         }),
       });
 
-      console.log("📥 Response status:", res.status);
-
       const data = await res.json();
-      console.log("📦 Response data:", data);
 
       if (data.error) {
-        console.error("❌ API Error:", data.error);
         alert("Error: " + data.error);
         setLoadingReply(false);
         return;
@@ -425,16 +414,14 @@ export default function Home() {
 
       setAiReply(data.reply);
       setEditableReply(data.reply); // ✅ editable copy
-      console.log("✅ Reply generated successfully!");
     } catch (error) {
-      console.error("❌ Fetch error:", error);
       alert("Failed to generate reply. Check console for details.");
     }
 
     setLoadingReply(false);
   }
 
-  async function generateSummary(mail: any) {
+  async function generateSummary(mail: Email) {
     setLoadingAI(true);
     const emailContent = cleanEmailBody(mail.body || mail.snippet || "");
 
@@ -462,32 +449,88 @@ export default function Home() {
   }
 
   // ✅ NEW: AI Priority function for individual emails
-  async function generateAIPriorityForMail(mail: any) {
+  async function generateAIPriorityForMail(mail: Email) {
 
-    // ✅ Already generated → skip
-    if (aiPriorityMap[mail.id]) return;
+    // ✅ Already generated → skip but still count as completed
+    if (aiPriorityMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+        }));
+      }
+      return;
+    }
 
-    const res = await fetch("/api/ai/priority", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject: mail.subject,
-        snippet: mail.snippet,
-      }),
-    });
+    try {
+      console.log(`🔍 Calling Priority API for email: ${mail.subject?.substring(0, 50)}`);
+      
+      const res = await fetch("/api/ai/priority", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: mail.subject,
+          snippet: mail.snippet,
+        }),
+      });
 
-    const data = await res.json();
+      console.log(`📡 Priority API Response Status: ${res.status}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Priority API HTTP Error ${res.status}:`, errorText);
+        
+        // Still count as completed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+          }));
+        }
+        return;
+      }
 
-    if (data.result?.score) {
-      setAiPriorityMap((prev: any) => ({
-        ...prev,
-        [mail.id]: data.result,
-      }));
+      const data = await res.json();
+      console.log(`📊 Priority API Response:`, data);
+
+      if (data.result?.score) {
+        console.log(`✅ Priority Score: ${data.result.score} - ${data.result.reason}`);
+        setAiPriorityMap((prev) => ({
+          ...prev,
+          [mail.id]: data.result,
+        }));
+        
+        // ✅ Only update progress if we're in batch processing mode
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+          }));
+        }
+      } else {
+        console.error("❌ Priority API returned no result:", data);
+        // Still count as completed even if failed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("❌ Priority API Error:", error);
+      // Still count as completed even if failed
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          priority: { ...prev.priority, completed: Math.min(prev.priority.completed + 1, prev.priority.total) }
+        }));
+      }
     }
   }
 
   // ✅ NEW: Generate AI-powered to-do title
-  async function generateAITodoTitle(mail: any) {
+  async function generateAITodoTitle(mail: Email) {
     // Already generated → skip
     if (aiTodoTitles[mail.id]) return;
 
@@ -504,7 +547,7 @@ export default function Home() {
       const data = await res.json();
 
       if (data.title) {
-        setAiTodoTitles((prev: any) => ({
+        setAiTodoTitles((prev) => ({
           ...prev,
           [mail.id]: data.title,
         }));
@@ -523,12 +566,12 @@ export default function Home() {
         }
       }
     } catch (error) {
-      console.error("Error generating AI todo title:", error);
+      // Silent fail - AI title generation is optional
     }
   }
 
   // ✅ NEW: Batch generate AI titles for all visible to-dos
-  async function generateAllTodoTitles(emails: any[]) {
+  async function generateAllTodoTitles(emails: Email[]) {
     const emailsNeedingTitles = emails.filter(mail => !aiTodoTitles[mail.id]);
     
     // Generate titles in parallel (max 5 at a time to avoid rate limits)
@@ -540,9 +583,17 @@ export default function Home() {
   }
 
   // ✅ AI: Generate AI-powered category for email
-  async function generateAICategoryForMail(mail: any) {
-    // Already generated → skip
-    if (aiCategoryMap[mail.id]) return;
+  async function generateAICategoryForMail(mail: Email) {
+    // Already generated → skip but still count as completed
+    if (aiCategoryMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          category: { ...prev.category, completed: Math.min(prev.category.completed + 1, prev.category.total) }
+        }));
+      }
+      return;
+    }
 
     try {
       const res = await fetch("/api/ai/categorize", {
@@ -557,20 +608,36 @@ export default function Home() {
       const data = await res.json();
 
       if (data.result?.category) {
-        setAiCategoryMap((prev: any) => ({
+        setAiCategoryMap((prev) => ({
           ...prev,
           [mail.id]: data.result,
         }));
+        
+        // ✅ Only update progress if we're in batch processing mode
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            category: { ...prev.category, completed: Math.min(prev.category.completed + 1, prev.category.total) }
+          }));
+        }
       }
     } catch (error) {
-      console.error("Error generating AI category:", error);
+      // Silent fail - AI category generation is optional
     }
   }
 
   // ✅ AI: Generate AI-powered spam detection for email
-  async function generateAISpamDetection(mail: any) {
-    // Already generated → skip
-    if (aiSpamMap[mail.id]) return;
+  async function generateAISpamDetection(mail: Email) {
+    // Already generated → skip but still count as completed
+    if (aiSpamMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          spam: { ...prev.spam, completed: Math.min(prev.spam.completed + 1, prev.spam.total) }
+        }));
+      }
+      return;
+    }
 
     try {
       const res = await fetch("/api/ai/spam-detect", {
@@ -586,22 +653,40 @@ export default function Home() {
       const data = await res.json();
 
       if (data.result) {
-        setAiSpamMap((prev: any) => ({
+        setAiSpamMap((prev) => ({
           ...prev,
           [mail.id]: data.result,
         }));
+        
+        // ✅ Only update progress if we're in batch processing mode
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            spam: { ...prev.spam, completed: Math.min(prev.spam.completed + 1, prev.spam.total) }
+          }));
+        }
       }
     } catch (error) {
-      console.error("Error generating AI spam detection:", error);
+      // Silent fail - AI spam detection is optional
     }
   }
 
   // ✅ AI: Generate AI-powered deadline extraction for email
-  async function generateAIDeadline(mail: any) {
-    // Already generated → skip
-    if (aiDeadlineMap[mail.id]) return;
+  async function generateAIDeadline(mail: Email) {
+    // Already generated → skip but still count as completed
+    if (aiDeadlineMap[mail.id]) {
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+        }));
+      }
+      return;
+    }
 
     try {
+      console.log(`🔍 Calling Deadline API for email: ${mail.subject?.substring(0, 50)}`);
+      
       const res = await fetch("/api/ai/extract-deadline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -611,40 +696,107 @@ export default function Home() {
         }),
       });
 
+      console.log(`📡 Deadline API Response Status: ${res.status}`);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`❌ Deadline API HTTP Error ${res.status}:`, errorText);
+        
+        // Still count as completed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+          }));
+        }
+        return;
+      }
+
       const data = await res.json();
+      console.log(`📊 Deadline API Response:`, data);
 
       if (data.result) {
-        setAiDeadlineMap((prev: any) => ({
+        console.log(`✅ Deadline: ${data.result.deadline} - Urgency: ${data.result.urgency}`);
+        setAiDeadlineMap((prev) => ({
           ...prev,
           [mail.id]: data.result,
         }));
+        
+        // ✅ Only update progress if we're in batch processing mode
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+          }));
+        }
+      } else {
+        console.error("❌ Deadline API returned no result:", data);
+        // Still count as completed even if failed
+        if (isBatchProcessing) {
+          setAiProgress(prev => ({
+            ...prev,
+            deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+          }));
+        }
       }
     } catch (error) {
-      console.error("Error generating AI deadline:", error);
+      console.error("❌ Deadline API Error:", error);
+      // Still count as completed even if failed
+      if (isBatchProcessing) {
+        setAiProgress(prev => ({
+          ...prev,
+          deadline: { ...prev.deadline, completed: Math.min(prev.deadline.completed + 1, prev.deadline.total) }
+        }));
+      }
     }
   }
 
-  // ✅ AI: Batch generate all AI data for visible emails
-  async function generateAllAIData(emails: any[]) {
-    const emailsNeedingAI = emails.slice(0, 20); // Process first 20 emails
+  // ✅ AI: Batch generate all AI data for visible emails (OPTIMIZED FOR GROQ)
+  async function generateAllAIData(emails: Email[]) {
+    // Process 2 emails at a time to avoid rate limits
+    const emailsNeedingAI = emails.filter(mail => 
+      !aiPriorityMap[mail.id]
+    ).slice(0, 2); // Reduced to 2 emails
     
-    // Generate all AI data in parallel (in batches of 5 to avoid overwhelming the API)
-    const batchSize = 5;
-    for (let i = 0; i < emailsNeedingAI.length; i += batchSize) {
-      const batch = emailsNeedingAI.slice(i, i + batchSize);
-      await Promise.all(batch.map(async (mail) => {
-        await Promise.all([
-          generateAIPriorityForMail(mail),
-          generateAICategoryForMail(mail),
-          generateAISpamDetection(mail),
-          generateAIDeadline(mail),
-        ]);
-      }));
+    if (emailsNeedingAI.length === 0) return;
+    
+    setIsBatchProcessing(true);
+    
+    // Initialize progress - Priority only
+    setShowAiProgress(true);
+    setAiProgress({
+      priority: { total: emailsNeedingAI.length, completed: 0, status: 'loading' },
+      category: { total: 0, completed: 0, status: 'done' },
+      spam: { total: 0, completed: 0, status: 'done' },
+      deadline: { total: 0, completed: 0, status: 'done' },
+    });
+    
+    // Process emails with 10-second delays (safer for rate limits)
+    for (let i = 0; i < emailsNeedingAI.length; i++) {
+      const mail = emailsNeedingAI[i];
+      
+      // Priority scoring only
+      if (!aiPriorityMap[mail.id]) {
+        await generateAIPriorityForMail(mail);
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds between requests
+      }
     }
+    
+    // Mark all as done
+    setAiProgress(prev => ({
+      priority: { ...prev.priority, status: 'done' },
+      category: { ...prev.category, status: 'done' },
+      spam: { ...prev.spam, status: 'done' },
+      deadline: { ...prev.deadline, status: 'done' },
+    }));
+    
+    setIsBatchProcessing(false);
+    
+    setTimeout(() => setShowAiProgress(false), 2000);
   }
 
 
-  async function generateExplanation(mail: any) {
+  async function generateExplanation(mail: Email) {
     setLoadingAI(true);
     const res = await fetch("/api/ai/explain", {
       method: "POST",
@@ -760,7 +912,7 @@ export default function Home() {
   }
 
   // ✅ Fallback: Simple title when AI is loading
-  function getSimpleTodoTitle(mail: any): string {
+  function getSimpleTodoTitle(mail: Email): string {
     const subject = mail.subject || "Read email";
     return subject.length > 45 ? subject.substring(0, 42) + "..." : subject;
   }
@@ -789,8 +941,6 @@ export default function Home() {
   useEffect(() => {
     if (!session) return;
 
-    console.log("✅ Session found. Loading emails...");
-
     // Show splash screen
     setShowSplash(true);
 
@@ -806,10 +956,6 @@ export default function Home() {
       try {
         const res = await fetch(`/api/gmail`);
         const data = await res.json();
-        console.log("FIRST EMAIL:", data.emails[0]);
-
-
-        console.log("📧 Emails loaded:", data.emails?.length || 0);
 
         setEmails(data.emails || []);
         setNextPageToken(data.nextPageToken || null);
@@ -821,7 +967,7 @@ export default function Home() {
         if (lastSeen) {
           const lastTime = new Date(lastSeen).getTime();
 
-          count = (data.emails || []).filter((mail: any) => {
+          count = (data.emails || []).filter((mail: Email) => {
             const mailTime = new Date(mail.date).getTime();
             return mailTime > lastTime;
           }).length;
@@ -833,12 +979,12 @@ export default function Home() {
         // Update last seen time to NOW
         // 🔔 Notification Logic (New mails since last click)
 
-        let freshMails: any[] = [];
+        let freshMails: Email[] = [];
 
         if (lastSeen) {
           const lastTime = new Date(lastSeen).getTime();
 
-          freshMails = (data.emails || []).filter((mail: any) => {
+          freshMails = (data.emails || []).filter((mail: Email) => {
             const mailTime = new Date(mail.date).getTime();
             return mailTime > lastTime;
           });
@@ -853,7 +999,7 @@ export default function Home() {
 
 
       } catch (error) {
-        console.error("❌ Error loading emails:", error);
+        // Error loading emails - user will see empty inbox
       }
 
       setLoading(false);
@@ -879,29 +1025,25 @@ export default function Home() {
     }
   }, [showTodoView, emails.length]);
 
-  // ✅ AI: Auto-generate AI data for emails when they load
+  // ✅ AI: Auto-generate AI data for emails when they load (OPTIMIZED)
   useEffect(() => {
-    if (emails.length > 0) {
-      // Get the currently displayed emails based on active folder and tab
-      const displayEmails = emails.filter((mail) => {
-        // Filter by folder
-        if (activeFolder === "inbox") {
-          if (mail.label?.includes("SENT") || mail.label?.includes("DRAFT")) return false;
-        } else if (activeFolder === "starred") {
-          return starredIds.includes(mail.id);
-        } else if (activeFolder === "snoozed") {
-          return snoozedIds.includes(mail.id);
-        } else if (activeFolder === "drafts") {
-          return mail.label?.includes("DRAFT");
-        }
-        
-        return true;
-      });
-      
-      // Generate AI data for first 20 visible emails
-      generateAllAIData(displayEmails.slice(0, 20));
+    // ✅ Safety check: only run in browser with session
+    if (typeof window === 'undefined' || !session || emails.length === 0) return;
+    
+    // ✅ CRITICAL FIX: Only process first 5 emails to avoid overwhelming API
+    const emailsNeedingAI = emails.slice(0, 5).filter(mail => 
+      !aiPriorityMap[mail.id] || 
+      !aiCategoryMap[mail.id] || 
+      !aiSpamMap[mail.id] || 
+      !aiDeadlineMap[mail.id]
+    );
+    
+    // Only generate if there are emails needing AI data
+    if (emailsNeedingAI.length > 0) {
+      generateAllAIData(emailsNeedingAI);
     }
-  }, [emails.length, activeTab, activeFolder, starredIds.length, snoozedIds.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emails.length, session]); // ✅ Depend on emails.length and session
 
   // ✅ NEW: Auto-generate AI titles for archived emails without titles
   useEffect(() => {
@@ -923,10 +1065,15 @@ export default function Home() {
     await loadEmails(); // fetch fresh inbox
   };
   // ✅ AI-POWERED: Get priority score from AI or cache
-  function getPriorityScore(mail: any) {
+  function getPriorityScore(mail: Email) {
     // Check if AI score exists in cache
     if (aiPriorityMap[mail.id]?.score) {
       return aiPriorityMap[mail.id].score;
+    }
+    
+    // ✅ Trigger AI generation if not in cache and not already processing
+    if (!aiPriorityMap[mail.id] && !isBatchProcessing) {
+      generateAIPriorityForMail(mail);
     }
     
     // Fallback to basic score while AI is loading
@@ -941,7 +1088,7 @@ export default function Home() {
   
   // ✅ AI-POWERED: Get email category from AI or cache
   // ✅ AI-POWERED: Get email category from AI or cache
-  function getEmailCategory(mail: any) {
+  function getEmailCategory(mail: Email) {
     // Check if AI category exists in cache
     if (aiCategoryMap[mail.id]?.category) {
       return aiCategoryMap[mail.id].category;
@@ -966,7 +1113,7 @@ export default function Home() {
   }
   
   // ✅ AI-POWERED: Check if email is spam using AI
-  function isSpamEmail(mail: any) {
+  function isSpamEmail(mail: Email) {
     // Check if AI spam detection exists in cache
     if (aiSpamMap[mail.id]) {
       return aiSpamMap[mail.id].isSpam;
@@ -1009,7 +1156,7 @@ export default function Home() {
     return null;
   }
 
-  function getBurnoutStats(emails: any[]) {
+  function getBurnoutStats(emails: Email[]) {
     let stressScore = 0;
 
     emails.forEach((mail) => {
@@ -1275,7 +1422,7 @@ export default function Home() {
   }
 
   // ✅ NEW: Check if email is actionable (for to-do list)
-  function isActionableEmail(mail: any) {
+  function isActionableEmail(mail: Email) {
     // Filter out spam and promotional emails
     if (isSpamEmail(mail)) return false;
     
@@ -1372,7 +1519,7 @@ export default function Home() {
     return false;
   }
 
-  function isFirstTimeSender(mail: any, allEmails: any[]) {
+  function isFirstTimeSender(mail: Email, allEmails: Email[]) {
     const sender = mail.from;
     const count = allEmails.filter((m) => m.from === sender).length;
     return count === 1;
@@ -1461,10 +1608,6 @@ if (!session) {
     </main>
   );
 }
-
-
-
-
   // ✅ FIX 3: Proper filtering with BOTH activeTab AND activeFolder
   const filteredEmails = emails.filter((mail) => {
     // ✅ To-Do View Filter
@@ -1529,7 +1672,7 @@ if (!session) {
   });
 
   // ✅ ENHANCED: Advanced sorting function
-  function sortEmails(emails: any[]) {
+  function sortEmails(emails: Email[]) {
     if (sortBy === "none") return emails;
     
     return [...emails].sort((a, b) => {
@@ -1587,7 +1730,7 @@ if (!session) {
   }
 
   // ✅ ENHANCED: Filter emails by deadline
-  function filterByDeadline(emails: any[]) {
+  function filterByDeadline(emails: Email[]) {
     if (deadlineFilter === "all") return emails;
     
     const now = new Date();
@@ -1914,6 +2057,146 @@ if (!session) {
           setShowCompose={setShowCompose}
         />
 
+        {/* AI Progress Indicator */}
+        {showAiProgress && (
+          <div
+            style={{
+              position: "fixed",
+              top: 100,
+              right: 20,
+              width: 320,
+              background: "rgba(255, 255, 255, 0.98)",
+              backdropFilter: "blur(20px)",
+              borderRadius: 20,
+              padding: 24,
+              boxShadow: "0 12px 40px rgba(109, 40, 217, 0.25)",
+              border: "2px solid #6D28D9",
+              zIndex: 10000,
+              animation: "slideIn 0.3s ease-out",
+            }}
+          >
+            <h3
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                marginBottom: 20,
+                background: "linear-gradient(135deg, #6D28D9 0%, #2563EB 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              🧠 AI Analyzing Emails...
+            </h3>
+
+            {/* Priority */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+                  {aiProgress.priority.status === 'done' ? '✅' : '⏳'} Analyzing priority...
+                </span>
+                <span style={{ fontSize: 13, color: "#6B7280" }}>
+                  {aiProgress.priority.completed}/{aiProgress.priority.total}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 6, background: "#E5E7EB", borderRadius: 999, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${(aiProgress.priority.completed / aiProgress.priority.total) * 100}%`,
+                    height: "100%",
+                    background: aiProgress.priority.status === 'done' ? "#10B981" : "linear-gradient(90deg, #6D28D9, #2563EB)",
+                    borderRadius: 999,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Category */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+                  {aiProgress.category.status === 'done' ? '✅' : '⏳'} Categorizing emails...
+                </span>
+                <span style={{ fontSize: 13, color: "#6B7280" }}>
+                  {aiProgress.category.completed}/{aiProgress.category.total}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 6, background: "#E5E7EB", borderRadius: 999, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${(aiProgress.category.completed / aiProgress.category.total) * 100}%`,
+                    height: "100%",
+                    background: aiProgress.category.status === 'done' ? "#10B981" : "linear-gradient(90deg, #8B5CF6, #6D28D9)",
+                    borderRadius: 999,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Spam Detection */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+                  {aiProgress.spam.status === 'done' ? '✅' : '⏳'} Detecting spam...
+                </span>
+                <span style={{ fontSize: 13, color: "#6B7280" }}>
+                  {aiProgress.spam.completed}/{aiProgress.spam.total}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 6, background: "#E5E7EB", borderRadius: 999, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${(aiProgress.spam.completed / aiProgress.spam.total) * 100}%`,
+                    height: "100%",
+                    background: aiProgress.spam.status === 'done' ? "#10B981" : "linear-gradient(90deg, #EF4444, #F59E0B)",
+                    borderRadius: 999,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Deadline Extraction */}
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+                  {aiProgress.deadline.status === 'done' ? '✅' : '⏳'} Extracting deadlines...
+                </span>
+                <span style={{ fontSize: 13, color: "#6B7280" }}>
+                  {aiProgress.deadline.completed}/{aiProgress.deadline.total}
+                </span>
+              </div>
+              <div style={{ width: "100%", height: 6, background: "#E5E7EB", borderRadius: 999, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${(aiProgress.deadline.completed / aiProgress.deadline.total) * 100}%`,
+                    height: "100%",
+                    background: aiProgress.deadline.status === 'done' ? "#10B981" : "linear-gradient(90deg, #0EA5E9, #2563EB)",
+                    borderRadius: 999,
+                    transition: "width 0.3s ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Powered by Qwen */}
+            <div
+              style={{
+                marginTop: 16,
+                paddingTop: 16,
+                borderTop: "1px solid #E5E7EB",
+                textAlign: "center",
+                fontSize: 12,
+                color: "#9CA3AF",
+                fontWeight: 600,
+              }}
+            >
+              Powered by Qwen3 Coder 480B ⚡
+            </div>
+          </div>
+        )}
+
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* ✅ FULL-SCREEN WEEKLY ANALYSIS */}
           {showWeeklyAnalysis ? (
@@ -1976,7 +2259,7 @@ if (!session) {
                       const data = await res.json();
                       setCalendarEvents([...calendarEvents, { ...data.event, date: new Date(data.event.date) }]);
                     } catch (error) {
-                      console.error("Failed to add event:", error);
+                      // Failed to add event
                     }
                   }}
                   onDeleteEvent={async (id) => {
@@ -1984,7 +2267,7 @@ if (!session) {
                       await fetch(`/api/calendar/events?id=${id}`, { method: "DELETE" });
                       setCalendarEvents(calendarEvents.filter(e => e.id !== id));
                     } catch (error) {
-                      console.error("Failed to delete event:", error);
+                      // Failed to delete event
                     }
                   }}
                   onEventClick={(event) => {
@@ -2066,7 +2349,6 @@ if (!session) {
                       setAssignedEmails([...assignedEmails, data.assignment]);
                       alert("✅ Email assigned successfully!");
                     } catch (error) {
-                      console.error("Failed to assign email:", error);
                       alert("❌ Failed to assign email");
                     }
                   }}
@@ -2078,10 +2360,10 @@ if (!session) {
                         body: JSON.stringify({ emailId, status }),
                       });
                       setAssignedEmails(assignedEmails.map(a => 
-                        a.emailId === emailId ? { ...a, status } : a
+                        a.emailId === emailId ? { ...a, status: status as EmailAssignment["status"] } : a
                       ));
                     } catch (error) {
-                      console.error("Failed to update status:", error);
+                      // Failed to update status
                     }
                   }}
                   onAddNote={async (emailId, note) => {
@@ -2092,10 +2374,10 @@ if (!session) {
                         body: JSON.stringify({ emailId, note }),
                       });
                       setAssignedEmails(assignedEmails.map(a => 
-                        a.emailId === emailId ? { ...a, notes: [...(a.notes || []), note] } : a
+                        a.emailId === emailId ? { ...a, notes: [...a.notes, note] } : a
                       ));
                     } catch (error) {
-                      console.error("Failed to add note:", error);
+                      // Failed to add note
                     }
                   }}
                 />
@@ -3283,7 +3565,7 @@ if (!session) {
                 </div>
 
                 {/* 📎 Attachments Section */}
-                {selectedMail?.attachments?.length > 0 && (
+                {selectedMail?.attachments && selectedMail.attachments.length > 0 && (
                   <div
                     style={{
                       marginTop: 20,
@@ -3297,7 +3579,7 @@ if (!session) {
                       📎 Attachments
                     </h3>
 
-                    {selectedMail.attachments.map((file: any) => (
+                    {selectedMail.attachments && selectedMail.attachments.map((file: Attachment) => (
                       <div
                         key={file.attachmentId}
                         style={{

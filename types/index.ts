@@ -10,6 +10,9 @@ export interface Email {
   label?: string[];
   attachments?: Attachment[];
   threadId?: string;
+  messageId?: string;
+  todoTitle?: string;
+  completedDate?: string;
 }
 
 export interface Attachment {
@@ -135,4 +138,37 @@ export interface APIError {
   error: string;
   message?: string;
   statusCode?: number;
+}
+
+// Calendar Types
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: Date;
+  time?: string;
+  type: "deadline" | "meeting" | "appointment" | "reminder";
+  description?: string;
+  emailId?: string;
+  reminderMinutes?: number;
+}
+
+// Team Collaboration Types
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  activeTasksCount: number;
+  responseRate: number;
+}
+
+export interface EmailAssignment {
+  id: string;
+  emailId: string;
+  assignedTo: string;
+  assignedBy: string;
+  assignedAt: string;
+  deadline?: string;
+  status: "assigned" | "in-progress" | "waiting-on-client" | "completed";
+  priority: number;
+  notes: string[];
 }

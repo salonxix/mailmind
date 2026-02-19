@@ -73,7 +73,7 @@ export default function EmailList({
                         (tab) => (
                             <button
                                 key={tab}
-                                onClick={() => setActiveTab(tab)}
+                                onClick={() => setActiveTab(tab as ActiveTab)}
                                 style={{
                                     padding: "8px 14px",
                                     borderRadius: 10,
